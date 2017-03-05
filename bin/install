@@ -1,0 +1,10 @@
+cd ..
+python -m venv .pip
+
+case "$OSTYPE" in
+  solaris*) echo "SOLARIS" ;;
+  darwin*)  echo "OSX" ;; 
+  linux*)   echo "LINUX" ;;
+  bsd*)     echo "BSD" ;;
+  *)        echo "unknown: $OSTYPE" ;;
+esac
