@@ -1,0 +1,4 @@
+http://stackoverflow.com/questions/12524994/encrypt-decrypt-using-pycrypto-aes-256
+https://gist.github.com/swinton/8409454
+
+To protect against dictionary, brute force, or other attacks, we use AES256 bit encryption with PBKDF2 SHA256, 4096 iterations. PBKDF2 is a key stretching algorithm used to hash passwords with a salt.
