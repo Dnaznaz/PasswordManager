@@ -4,7 +4,10 @@ python -m venv .pip
 case "$OSTYPE" in
   solaris*) echo "SOLARIS" ;;
   darwin*)  echo "OSX" ;; 
-  linux*)   echo "LINUX" ;;
+  linux*)  
+    source .pip/bin/activate
+    pip3 install -r requirements.txt
+  ;;
   bsd*)     echo "BSD" ;;
   *)        echo "unknown: $OSTYPE" ;;
 esac
