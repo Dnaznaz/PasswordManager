@@ -12,7 +12,7 @@ class DatabaseManager:
             self.conn = sqlite3.connect(PASSWORDS_DATA_PATH)
         print('opened database connection')
 
-        self.maxID = self._getID()
+        self.maxID = self._getBigID()
 
     def __enter__(self):
         return self
@@ -31,10 +31,10 @@ class DatabaseManager:
 
         for i in range(len(data)):
             if data[i][0] != i:
-                val = (i, data[i][1], data[i][2],)
-                self._execute("UPDATE PASSWORDS set ID=? where NAME=? and PASS=?", val)
+                val = (i, data[i][0],)
+                self._execute("UPDATE PASSWORDS set ID=? where ID=?", val)
 
-    def _getID(self):
+    def _getBigID(self):
         for row in self._execute("SELECT Count(*) from PASSWORDS"):
             return row[0]
 
@@ -76,13 +76,17 @@ class DatabaseManager:
 
     def makeBackup(self, file):
         n = 1
-        while (os.path.isfile('data\passwords' + str(n) + '.db.old')):
-            n+=1
+        while (os.path.isfile('data\passwords{}.db.old'.format(n))):
+            n += 1
 
-        open('data\passwords' + str(n) + '.db.old', 'x').close()
-        with open('data\passwords' + str(n) + '.db.old', 'w') as backupFile:
+        fileName = 'data\passwords{}.db.old'.format(n)
+
+        open(fileName, 'x').close()
+        with open(fileName, 'w') as backupFile:
             for line in file.readlines():
                 backupFile.write(line)
+
+        return fileName
 
     def cancelChanges(self):
         self.conn.rollback()
