@@ -1,4 +1,3 @@
-cd ..
 python -m venv .pip
 
 case "$OSTYPE" in
