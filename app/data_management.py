@@ -6,15 +6,13 @@ PASSWORDS_DATA_PATH = 'data\passwords.db'
 class DatabaseManager:
 
     def __init__(self):
-        self.maxID = 0
-
         if not os.path.isfile(PASSWORDS_DATA_PATH):
             self.createDatabase()
         else:
             self.conn = sqlite3.connect(PASSWORDS_DATA_PATH)
         print('opened database connection')
 
-        print('passwords table init')
+        self.maxID = self._getID()
 
     def __enter__(self):
         return self
@@ -36,6 +34,10 @@ class DatabaseManager:
                 val = (i, data[i][1], data[i][2],)
                 self._execute("UPDATE PASSWORDS set ID=? where NAME=? and PASS=?", val)
 
+    def _getID(self):
+        for row in self._execute("SELECT Count(*) from PASSWORDS"):
+            return row[0]
+
     def createDatabase(self):
         open(PASSWORDS_DATA_PATH, 'x').close()
 
@@ -48,7 +50,8 @@ class DatabaseManager:
 
     def getPassFromDatabase(self, key):
         val = (key,)
-        return self._execute("SELECT pass from PASSWORDS where ID=?", val)[0][0]
+        for row in self._execute("SELECT pass from PASSWORDS where ID=?", val):
+            return row[0]
 
     def getAllFromTable(self):
         data = []
