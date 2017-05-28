@@ -13,5 +13,5 @@ def start():
     pm.bootstrap()
     pm.startApp()
 
-if __name__ == 'main':
+if __name__ == '__main__':
     start()
