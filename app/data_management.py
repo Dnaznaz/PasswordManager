@@ -1,100 +1,138 @@
 import sqlite3
 import os
 
-PASSWORDS_DATA_PATH = 'data\passwords.db'
+PASSWORDS_DATA_PATH = r'data\passwords.db'
+_conn = None
+_cursor = None
+_maxID = 0
 
-class DatabaseManager:
+def _cleanup():
+    '''Reorganizes the row id's to pack them more tightly'''
+    _cursor.execute("SELECT ID FROM PASSWORDS")
 
-    def __init__(self):
-        if not os.path.isfile(PASSWORDS_DATA_PATH):
-            self.createDatabase()
-        else:
-            self.conn = sqlite3.connect(PASSWORDS_DATA_PATH)
-        print('opened database connection')
+    data = _cursor.fetchall()
+    unorganized = []
+    for i in range(len(data)):
+        if data[i][0] != i:
+            unorganized.append((i, data[i][0],))
 
-        self.maxID = self._getBigID()
+    _cursor.executemany("UPDATE PASSWORDS set ID=? where ID=?", unorganized)
 
-    def __enter__(self):
-        return self
+def _getBigID():
+    '''Return the highest ID value in the table'''
+    _cursor.execute("SELECT ID from PASSWORDS")
+    ids = list(map(lambda x: x[0], _cursor.fetchall()))
+    if len(ids) > 0:
+        return max(ids)
+    else:
+        return 0
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.closeConnection()
+def _closeConnection():
+    '''Close the connection to the table'''
+    global _conn, _cursor
 
-    def _execute(self, command, values=None):
-        if values is not None:
-            return self.conn.execute(command, values)
-        else:
-            return self.conn.execute(command)
+    if _cursor is not None:
+        _cursor.close()
+        _cursor = None
+    if _conn is not None:
+        _conn.close()
+        _conn = None
 
-    def _cleanup(self):
-        data = self.getAllFromTable()
+def _setConnection(connection):
+    global _conn
 
-        for i in range(len(data)):
-            if data[i][0] != i:
-                val = (i, data[i][0],)
-                self._execute("UPDATE PASSWORDS set ID=? where ID=?", val)
+    if _conn is not None:
+        _conn.close()
+        _conn = None
+    _conn = connection
 
-    def _getBigID(self):
-        for row in self._execute("SELECT Count(*) from PASSWORDS"):
-            return row[0]
+def _setCursor(cur):
+    global _cursor
 
-    def createDatabase(self):
-        open(PASSWORDS_DATA_PATH, 'x').close()
+    if _cursor is not None:
+        _cursor.close()
+        _cursor = None
+    _cursor = cur
 
-        self.conn = sqlite3.connect(PASSWORDS_DATA_PATH)
-        self._execute('''CREATE TABLE PASSWORDS
+def _initConnection():
+    '''Start the connection to the table'''
+    _setConnection(sqlite3.connect(PASSWORDS_DATA_PATH))
+    _setCursor(_conn.cursor())
+
+    print('opened database connection')
+
+def _initTable():
+    '''Open a new table in the database'''
+    if _conn is None or _cursor is None:
+        _initConnection()
+
+    _cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='PASSWORDS'")
+    if _cursor.fetchone() is None:
+        _cursor.execute('''CREATE TABLE PASSWORDS
         (ID INT PRIMARY KEY    NOT NULL,
         NAME        TEXT    NOT NULL,
         PASS        TEXT    NOT NULL);''')
-        print('created new table')
+    print('init table')
 
-    def getPassFromDatabase(self, key):
-        val = (key,)
-        for row in self._execute("SELECT pass from PASSWORDS where ID=?", val):
-            return row[0]
+def initDatabase():
+    if not os.path.isfile(PASSWORDS_DATA_PATH):
+        createDatabase()
+    else:
+        _initTable()
+    print("finished database init")
 
-    def getAllFromTable(self):
-        data = []
-        cursor = self._execute("SELECT id, name, pass from PASSWORDS")
+    global _maxID
+    _maxID = _getBigID()
 
-        for row in cursor:
-            data.append((row[0], row[1], row[2]))
+def createDatabase():
+    open(PASSWORDS_DATA_PATH, 'x').close()
+    print('created new database')
+    _initTable()
 
-        return data
+def getAllFromTable():
+    _cursor.execute("SELECT id, name, pass from PASSWORDS")
 
-    def addToDatabase(self, name, value):
-        val = (self.maxID, name, value,)
-        self._execute("INSERT INTO PASSWORDS (ID,NAME,PASS) VALUES (?,?,?)", val)
+    return list(map(lambda x: (x[0], x[1], x[2]), _cursor.fetchall()))
 
-    def changeInDatabase(self, ID, name, value):
-        val = (ID, name, value,)
-        self._execute("UPDATE PASSWORDS set NAME = ?, PASS = ? where ID=?", val)
+def getPassFromDatabase(key):
+    val = (key,)
 
-    def deleteFromDatabase(self, ID):
-        val = (ID,)
-        self._execute("DELETE from PASSWORDS where ID=?", val)
+    _cursor.execute("SELECT pass from PASSWORDS where ID=?", val)
+    return _cursor.fetchone()
 
-    def makeBackup(self, file):
-        n = 1
-        while (os.path.isfile('data\passwords{}.db.old'.format(n))):
-            n += 1
+def addToDatabase(name, value):
+    val = (_maxID, name, value,)
+    _conn.execute("INSERT INTO PASSWORDS (ID,NAME,PASS) VALUES (?,?,?)", val)
 
-        fileName = 'data\passwords{}.db.old'.format(n)
+def changeInDatabase(ID, name, value):
+    val = (ID, name, value,)
+    _conn.execute("UPDATE PASSWORDS set NAME = ?, PASS = ? where ID=?", val)
 
-        open(fileName, 'x').close()
-        with open(fileName, 'w') as backupFile:
-            for line in file.readlines():
-                backupFile.write(line)
+def deleteFromDatabase(ID):
+    val = (ID,)
+    _conn.execute("DELETE from PASSWORDS where ID=?", val)
 
-        return fileName
+def makeBackup(file):
+    n = 1
+    while (os.path.isfile('data\passwords{}.db.old'.format(n))):
+        n += 1
 
-    def cancelChanges(self):
-        self.conn.rollback()
+    fileName = 'data\passwords{}.db.old'.format(n)
 
-    def saveChanges(self):
-        self.conn.commit()
+    open(fileName, 'x').close()
+    with open(fileName, 'w') as backupFile:
+        for line in file.readlines():
+            backupFile.write(line)
 
-    def closeConnection(self):
-        self._cleanup()
-        self.saveChanges()
-        self.conn.close()
+    return fileName
+
+def cancelChanges():
+    _conn.rollback()
+
+def saveChanges():
+    _conn.commit()
+
+def closeConnection():
+    _cleanup()
+    saveChanges()
+    _closeConnection()
