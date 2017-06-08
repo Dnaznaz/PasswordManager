@@ -1,22 +1,9 @@
 import sqlite3
 import os
 
-PASSWORDS_DATA_PATH = r'data\passwords.db'
+DATABASE_PATH = None
 _conn = None
 _cursor = None
-_maxID = 0
-
-def _cleanup():
-    '''Reorganizes the row id's to pack them more tightly'''
-    _cursor.execute("SELECT ID FROM PASSWORDS")
-
-    data = _cursor.fetchall()
-    unorganized = []
-    for i in range(len(data)):
-        if data[i][0] != i:
-            unorganized.append((i, data[i][0],))
-
-    _cursor.executemany("UPDATE PASSWORDS set ID=? where ID=?", unorganized)
 
 def _getBigID():
     '''Return the highest ID value in the table'''
@@ -56,7 +43,7 @@ def _setCursor(cur):
 
 def _initConnection():
     '''Start the connection to the table'''
-    _setConnection(sqlite3.connect(PASSWORDS_DATA_PATH))
+    _setConnection(sqlite3.connect(DATABASE_PATH))
     _setCursor(_conn.cursor())
 
     print('opened database connection')
@@ -75,7 +62,7 @@ def _initTable():
     print('init table')
 
 def initDatabase():
-    if not os.path.isfile(PASSWORDS_DATA_PATH):
+    if not os.path.isfile(DATABASE_PATH):
         createDatabase()
     else:
         _initTable()
@@ -85,7 +72,7 @@ def initDatabase():
     _maxID = _getBigID()
 
 def createDatabase():
-    open(PASSWORDS_DATA_PATH, 'x').close()
+    open(DATABASE_PATH, 'x').close()
     print('created new database')
     _initTable()
 
@@ -100,17 +87,19 @@ def getPassFromDatabase(key):
     _cursor.execute("SELECT pass from PASSWORDS where ID=?", val)
     return _cursor.fetchone()
 
-def addToDatabase(name, value):
-    val = (_maxID, name, value,)
-    _conn.execute("INSERT INTO PASSWORDS (ID,NAME,PASS) VALUES (?,?,?)", val)
+def setInDatabase(ID, name, value):
+    checkVal = (ID,)
+    count = _cursor.execute("select count(1) from PASSWORDS where ID = ?", checkVal)
 
-def changeInDatabase(ID, name, value):
     val = (ID, name, value,)
-    _conn.execute("UPDATE PASSWORDS set NAME = ?, PASS = ? where ID=?", val)
+    if count == 0:
+        _cursor.execute("INSERT INTO PASSWORDS (ID,NAME,PASS) VALUES (?,?,?)", val)
+    else:
+        _cursor.execute("UPDATE PASSWORDS set NAME = ?, PASS = ? where ID=?", val)
 
 def deleteFromDatabase(ID):
     val = (ID,)
-    _conn.execute("DELETE from PASSWORDS where ID=?", val)
+    _cursor.execute("DELETE from PASSWORDS where ID=?", val)
 
 def makeBackup(file):
     n = 1
@@ -133,6 +122,6 @@ def saveChanges():
     _conn.commit()
 
 def closeConnection():
-    _cleanup()
+    #_cleanup()
     saveChanges()
     _closeConnection()

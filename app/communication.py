@@ -7,8 +7,8 @@ SERVER_MAC, PORT = _getConnectivityConfig()
 socket = None
 
 def init():
-    socket = bluethooth.BluethoothSocket(bluethooth.RFCOMM)
-    socket.connect((SERVER_MAC, PORT))
+    socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+    socket.bind((SERVER_MAC, PORT))
     socket.listen(1)
     try:
         client, clientInfo = socket.accept()
