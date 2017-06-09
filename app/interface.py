@@ -9,11 +9,11 @@ import crypto_manager as crypto
 
 _killEvent = threading.Event()
 
-def init(**kwargs):
+def init_interface(**kwargs):
     '''Initiate the interface'''
 
     comm.set_hadling_command(caller)
-    threading.Thread(target=comm.init, name='communication', daemon=True, args=(_killEvent)).start()
+    threading.Thread(target=comm.init_communication, name='communication', daemon=True, args=(_killEvent,)).start()
 
     if kwargs['cmdListening'] is True:
         threading.Thread(target=cmd_listener, name='CMD listener', args=(_killEvent,)).start()
@@ -191,6 +191,7 @@ def shutdown():
     comm.shutdown()
     _killEvent.set()
 
+# ----- commands list -----
 _commandsDict = {
     "SET-USER":set_user, # not started
     "GET":get_password, # comm missing

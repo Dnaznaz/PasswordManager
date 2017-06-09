@@ -2,8 +2,18 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 import hashlib
 
-def hashPassword(uPass, salt):
-    return hashlib.pbkdf2_hmac(hash_name='sha512', password=uPass, salt=salt, iterations=100000)
+MASTER_PASSWORD = ''
+SALT = ''
+
+def hash_password(uPass, salt):
+    '''DOC'''
+
+    return hashlib.pbkdf2_hmac(
+        hash_name='sha512',
+        password=uPass,
+        salt=salt,
+        iterations=10000
+        )
 
 def encrypt_symm(auth_pass, data):
     key = get_random_bytes(16)
@@ -24,4 +34,9 @@ def decrypt_asymm(auth_pass, enc_data):
     pass
 
 def authorize(auth_pass):
-    pass
+    '''DOC'''
+
+    if MASTER_PASSWORD == '':
+        return True
+
+    return MASTER_PASSWORD == hash_password(auth_pass, SALT)

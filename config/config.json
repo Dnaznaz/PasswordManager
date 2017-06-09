@@ -1,5 +1,7 @@
 {
     "default":{
-        "database_path":"data/passwords.db"
+        "database_path":"data/passwords.db",
+        "master_password":"",
+        "salt":""
     }
 }
