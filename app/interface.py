@@ -12,7 +12,8 @@ _killEvent = threading.Event()
 def init(**kwargs):
     '''Initiate the interface'''
 
-    threading.Thread(target=comm.init, name='communication', daemon=True).start()
+    comm.set_hadling_command(caller)
+    threading.Thread(target=comm.init, name='communication', daemon=True, args=(_killEvent)).start()
 
     if kwargs['cmdListening'] is True:
         threading.Thread(target=cmd_listener, name='CMD listener', args=(_killEvent,)).start()
@@ -29,7 +30,6 @@ def cmd_listener(event):
         # shuts down the program if the input was exit
         if data == "exit":
             shutdown()
-            break
 
         caller(data)
 
@@ -79,7 +79,7 @@ def get_password(**kwargs):
         print('no ID was supplied')
         return
 
-    encPass = dm.getPassFromDatabase(pID)
+    encPass = dm.get_pass_from_database(pID)
 
     if encPass is None:
         print('error retriving password, ID={0}'.format(pID))
@@ -90,7 +90,7 @@ def get_password(**kwargs):
         print('no authorization password was supplied')
         return
 
-    decPass = crypto.decrypt(auth_password, encPass)
+    decPass = crypto.decrypt_symm(auth_password, encPass)
 
     if decPass is None:
         print('error retriving password, ID={0}'.format(pID))
@@ -123,11 +123,11 @@ def set_password(**kwargs):
         print('no authorization password was supplied')
         return
 
-    encName = crypto.encrypt(auth_password, name)
-    encPass = crypto.encrypt(auth_password, password)
+    encName = crypto.encrypt_symm(auth_password, name)
+    encPass = crypto.encrypt_symm(auth_password, password)
 
     if crypto.authorize(auth_password) is True:
-        dm.setInDatabase(pID, encName, encPass)
+        dm.set_in_database(pID, encName, encPass)
 
     #TODO comm send OK or error
 
@@ -149,7 +149,7 @@ def delete_password(**kwargs):
         return
 
     if crypto.authorize(auth_password) is True:
-        dm.deleteFromDatabase(pID)
+        dm.delete_from_database(pID)
 
     #TODO comm send OK or error
 
@@ -169,27 +169,37 @@ def get_data_list(**kwargs):
         return
 
     if crypto.authorize(auth_password) is True:
-        table = dm.getAllFromTable()
+        table = dm.get_all_from_table()
     else:
         return
 
     for pID, name, password in table:
-        nameDict[pID] = crypto.decrypt(auth_password, name)
+        nameDict[pID] = crypto.decrypt_symm(auth_password, name)
 
     #TODO comm send nameDict or error
 
-_commandsDict = {
-    "GET":get_password,
-    "SET":set_password,
-    "DELETE":delete_password,
-    "GET-ALL":get_data_list
-    }
+def set_user(**kwargs):
+    pass
+
+def close_connection(**kwargs):
+    pass
 
 def shutdown():
     '''Shuts down the program'''
 
-    dm.closeConnection()
+    dm.shutdown()
+    comm.shutdown()
     _killEvent.set()
+
+_commandsDict = {
+    "SET-USER":set_user, # not started
+    "GET":get_password, # comm missing
+    "SET":set_password, # comm missing
+    "DELETE":delete_password, # comm missing
+    "GET-ALL":get_data_list, # comm missing
+    "SHUTDOWN":shutdown, # done
+    "CLOSE":close_connection # not started
+    }
 
 def _pop_value(dict, key):
     '''Return the value from the given key and the delete the entry'''

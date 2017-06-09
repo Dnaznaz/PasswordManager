@@ -1,31 +1,13 @@
 import sqlite3
 import os
+import time
 
 DATABASE_PATH = None
 _conn = None
-_cursor = None
 
-def _getBigID():
-    '''Return the highest ID value in the table'''
-    _cursor.execute("SELECT ID from PASSWORDS")
-    ids = list(map(lambda x: x[0], _cursor.fetchall()))
-    if len(ids) > 0:
-        return max(ids)
-    else:
-        return 0
+def _set_connection(connection):
+    '''DOC'''
 
-def _closeConnection():
-    '''Close the connection to the table'''
-    global _conn, _cursor
-
-    if _cursor is not None:
-        _cursor.close()
-        _cursor = None
-    if _conn is not None:
-        _conn.close()
-        _conn = None
-
-def _setConnection(connection):
     global _conn
 
     if _conn is not None:
@@ -33,80 +15,107 @@ def _setConnection(connection):
         _conn = None
     _conn = connection
 
-def _setCursor(cur):
-    global _cursor
-
-    if _cursor is not None:
-        _cursor.close()
-        _cursor = None
-    _cursor = cur
-
-def _initConnection():
+def _init_connection():
     '''Start the connection to the table'''
-    _setConnection(sqlite3.connect(DATABASE_PATH))
-    _setCursor(_conn.cursor())
+
+    _set_connection(sqlite3.connect(DATABASE_PATH))
 
     print('opened database connection')
 
-def _initTable():
+def _init_table():
     '''Open a new table in the database'''
-    if _conn is None or _cursor is None:
-        _initConnection()
 
-    _cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='PASSWORDS'")
-    if _cursor.fetchone() is None:
-        _cursor.execute('''CREATE TABLE PASSWORDS
+    if _conn is None:
+        _init_connection()
+
+    cur = _conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='PASSWORDS'") #TODO test if real none
+    if cur.fetchone() is None:
+        cur.execute('''CREATE TABLE PASSWORDS
         (ID INT PRIMARY KEY    NOT NULL,
         NAME        TEXT    NOT NULL,
         PASS        TEXT    NOT NULL);''')
     print('init table')
 
-def initDatabase():
+def init_database():
+    '''DOC'''
+
     if not os.path.isfile(DATABASE_PATH):
-        createDatabase()
-    else:
-        _initTable()
+        create_database()
+
+    _init_table()
     print("finished database init")
 
-    global _maxID
-    _maxID = _getBigID()
+def create_database():
+    '''DOC'''
 
-def createDatabase():
     open(DATABASE_PATH, 'x').close()
     print('created new database')
-    _initTable()
 
-def getAllFromTable():
-    _cursor.execute("SELECT id, name, pass from PASSWORDS")
+def get_all_from_table():
+    '''DOC'''
 
-    return list(map(lambda x: (x[0], x[1], x[2]), _cursor.fetchall()))
+    cur = _conn.cursor()
+    cur.execute("SELECT ID, NAME, PASS from PASSWORDS")
 
-def getPassFromDatabase(key):
+    return list(map(lambda x: (x[0], x[1], x[2]), cur.fetchall()))
+
+def get_pass_from_database(key):
+    '''DOC'''
+
     val = (key,)
 
-    _cursor.execute("SELECT pass from PASSWORDS where ID=?", val)
-    return _cursor.fetchone()
+    cur = _conn.cursor()
+    cur.execute("SELECT pass from PASSWORDS where ID=?", val)
 
-def setInDatabase(ID, name, value):
+    res = cur.fetchone()
+    if res:
+        return res[0]
+    else:
+        return None
+
+def set_in_database(ID, name, value):
+    '''DOC'''
+
     checkVal = (ID,)
-    count = _cursor.execute("select count(1) from PASSWORDS where ID = ?", checkVal)
+
+    cur = _conn.cursor()
+    count = cur.execute("select count(1) from PASSWORDS where ID = ?", checkVal).fetchone()[0]
 
     val = (ID, name, value,)
-    if count == 0:
-        _cursor.execute("INSERT INTO PASSWORDS (ID,NAME,PASS) VALUES (?,?,?)", val)
-    else:
-        _cursor.execute("UPDATE PASSWORDS set NAME = ?, PASS = ? where ID=?", val)
+    try:
+        if count == 0:
+            cur.execute("INSERT INTO PASSWORDS (ID,NAME,PASS) VALUES (?,?,?)", val)
+        else:
+            cur.execute("UPDATE PASSWORDS set NAME = ?, PASS = ? where ID=?", val)
+        _conn.commit()
+        return True
+    except:
+        return False
 
-def deleteFromDatabase(ID):
+def delete_from_database(ID):
+    '''DOC'''
+
     val = (ID,)
-    _cursor.execute("DELETE from PASSWORDS where ID=?", val)
 
-def makeBackup(file):
-    n = 1
-    while (os.path.isfile('data\passwords{}.db.old'.format(n))):
-        n += 1
+    cur = _conn.cursor()
+    try:
+        cur.execute("DELETE from PASSWORDS where ID=?", val).rowcount
+        _conn.commit()
+        return True
+    except:
+        return False
 
-    fileName = 'data\passwords{}.db.old'.format(n)
+def make_backup(file):
+    '''DOC'''
+
+    fileName = 'data/passwords{month}.{day}.{year}.{hour}.{minute}.db.old'.format(
+        day=time.strftime('%d'),
+        month=time.strftime('%h'),
+        year=time.strftime('%y'),
+        hour=time.strftime('%H'),
+        minute=time.strftime('%M')
+        )
 
     open(fileName, 'x').close()
     with open(fileName, 'w') as backupFile:
@@ -115,13 +124,13 @@ def makeBackup(file):
 
     return fileName
 
-def cancelChanges():
-    _conn.rollback()
+def close_connection():
+    '''Close the connection to the table'''
 
-def saveChanges():
-    _conn.commit()
+    global _conn
+    if _conn is not None:
+        _conn.close()
+        _conn = None
 
-def closeConnection():
-    #_cleanup()
-    saveChanges()
-    _closeConnection()
+def shutdown():
+    close_connection()

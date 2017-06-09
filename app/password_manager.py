@@ -46,7 +46,7 @@ def bootstrap(options):
     if config['reset'] is True and os.path.isfile(dm.DATABASE_PATH):
         os.remove(dm.DATABASE_PATH)
 
-    dm.initDatabase()
+    dm.init_database()
 
 def create_pid():
     '''Save the pid number of the proccess in "tmp/pid"'''
