@@ -96,6 +96,11 @@ def responed(addr, msg):
 
     _send_encrypted(clients[addr], msg, clientKeys[addr])
 
+def close_connection(addr):
+    '''DOC'''
+
+    _terminate_connection(clients[addr], addr)
+
 def _handle(soc, addr):
     '''DOC'''
 
@@ -153,7 +158,7 @@ def _terminate_connection(soc, addr):
 
     _send_encrypted(soc, "CLOSING", clientKeys[addr])
     soc.close()
-    clientKeys.pop(addr)
+    clients.pop(addr)
     clientKeys.pop(addr)
 
 def shutdown():

@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import time
+import binascii
 
 DATABASE_PATH = None
 _conn = None
@@ -34,7 +35,8 @@ def _init_table():
         cur.execute('''CREATE TABLE PASSWORDS
         (ID INT PRIMARY KEY    NOT NULL,
         NAME        TEXT    NOT NULL,
-        PASS        TEXT    NOT NULL);''')
+        PASS        TEXT    NOT NULL,
+        IV          TEST    NOT NULL);''')
     print('init table')
 
 def init_database():
@@ -56,9 +58,9 @@ def get_all_from_table():
     '''DOC'''
 
     cur = _conn.cursor()
-    cur.execute("SELECT ID, NAME, PASS from PASSWORDS")
+    cur.execute("SELECT ID, NAME, PASS, IV from PASSWORDS")
 
-    return list(map(lambda x: (x[0], x[1], x[2]), cur.fetchall()))
+    return list(map(lambda x: (x[0], x[1], x[2], binascii.unhexlify(x[3])), cur.fetchall()))
 
 def get_pass_from_database(key):
     '''DOC'''
@@ -66,32 +68,31 @@ def get_pass_from_database(key):
     val = (key,)
 
     cur = _conn.cursor()
-    cur.execute("SELECT pass from PASSWORDS where ID=?", val)
+    cur.execute("SELECT NAME, PASS, IV from PASSWORDS where ID=?", val)
 
     res = cur.fetchone()
     if res:
-        return res[0]
+        return (res[0], res[1], binascii.unhexlify(res[2]))
     else:
         return None
 
-def set_in_database(ID, name, value):
+def set_in_database(ID, name, value, iv):
     '''DOC'''
 
-    checkVal = (ID,)
-
     cur = _conn.cursor()
-    count = cur.execute("select count(1) from PASSWORDS where ID = ?", checkVal).fetchone()[0]
-
-    val = (ID, name, value,)
     try:
-        if count == 0:
-            cur.execute("INSERT INTO PASSWORDS (ID,NAME,PASS) VALUES (?,?,?)", val)
+        if ID == -1:
+            newID = cur.execute("SELECT MAX(ID) FROM PASSWORDS").fetchone()[0]
+            val = (newID, name, value, binascii.hexlify(iv),)
+            cur.execute("INSERT INTO PASSWORDS (ID,NAME,PASS,IV) VALUES (?,?,?,?)", val)
+            return newID
         else:
-            cur.execute("UPDATE PASSWORDS set NAME = ?, PASS = ? where ID=?", val)
+            val = (ID, name, value, binascii.hexlify(iv),)
+            cur.execute("UPDATE PASSWORDS set NAME = ?, PASS = ?, IV = ? where ID=?", val)
         _conn.commit()
-        return True
+        return ID
     except:
-        return False
+        return -1
 
 def delete_from_database(ID):
     '''DOC'''

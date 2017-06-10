@@ -2,6 +2,8 @@
 
 from sys import platform
 import threading
+import time
+import json
 
 import communication as comm
 import data_management as dm
@@ -77,26 +79,33 @@ def get_password(**kwargs):
 
     if pID is None:
         print('no ID was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no ID was supplied"')
         return
 
-    encPass = dm.get_pass_from_database(pID)
+    res = dm.get_pass_from_database(pID)
 
-    if encPass is None:
+    if res is None:
         print('error retriving password, ID={0}'.format(pID))
+        comm.responed(reqID, 'STATUS=ERROR MSG="could not retrive password with ID {0}"'.format(pID))
         return
+
+    encName, encPass, iv = res
 
     auth_password = _pop_value(kwargs, 'AUTH_PASSWORD')
     if auth_password is None:
         print('no authorization password was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no master password was supplied"')
         return
 
-    decPass = crypto.decrypt_symm(auth_password, encPass)
+    decName = crypto.decrypt_symm(auth_password, encName, iv)
+    decPass = crypto.decrypt_symm(auth_password, encPass, iv)
 
-    if decPass is None:
+    if decPass is None or decName is None:
         print('error retriving password, ID={0}'.format(pID))
+        comm.responed(reqID, 'STATUS=ERROR MSG="could not retrive password with ID {0}"'.format(pID))
         return
 
-    #TODO comm send password or error
+    comm.responed(reqID, "STATUS=OK NAME={name} PASSWORD={password}".format(name=decName, password=decPass))
 
 def set_password(**kwargs):
     '''DOC'''
@@ -112,24 +121,40 @@ def set_password(**kwargs):
         return
     if pID is None:
         print('no ID was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no ID was given"')
         return
     if name is None:
         print('no name was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no name was given"')
         return
     if password is None:
         print('no password was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no password was given"')
         return
     if auth_password is None:
         print('no authorization password was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no master password was given"')
         return
 
-    encName = crypto.encrypt_symm(auth_password, name)
-    encPass = crypto.encrypt_symm(auth_password, password)
+    iv = crypto.get_iv()
 
+    encName = crypto.encrypt_symm(auth_password, name, iv)
+    encPass = crypto.encrypt_symm(auth_password, password, iv)
+
+    if encPass is None or encName is None:
+        print('error adding password, Name={0}'.format(name))
+        comm.responed(reqID, 'STATUS=ERROR MSG="could not add or update password {0}"'.format(name))
+        return
+
+    res = -1
     if crypto.authorize(auth_password) is True:
-        dm.set_in_database(pID, encName, encPass)
+        res = dm.set_in_database(pID, encName, encPass)
 
-    #TODO comm send OK or error
+    if res == -1:
+        print('error adding password, Name={0}'.format(name))
+        comm.responed(reqID, 'STATUS=ERROR MSG="could not add or update password {0}"'.format(name))
+    else:
+        comm.responed(reqID, 'STATUS=OK ID={pID}'.format(pID=res))
 
 def delete_password(**kwargs):
     '''DOC'''
@@ -143,15 +168,20 @@ def delete_password(**kwargs):
         return
     if pID is None:
         print('no ID was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no ID was given"')
         return
     if auth_password is None:
         print('no authorization password was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no master password was given"')
         return
 
     if crypto.authorize(auth_password) is True:
-        dm.delete_from_database(pID)
+        res = dm.delete_from_database(pID)
 
-    #TODO comm send OK or error
+    if res is True:
+        comm.responed(reqID, 'STATUS=OK')
+    else:
+        comm.responed(reqID, 'STATUS=ERROR MSG="could not delete password with id {pID}"'.format(pID=res))
 
 def get_data_list(**kwargs):
     '''DOC'''
@@ -166,6 +196,7 @@ def get_data_list(**kwargs):
         return
     if auth_password is None:
         print('no authorization password was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no master password was given"')
         return
 
     if crypto.authorize(auth_password) is True:
@@ -173,16 +204,59 @@ def get_data_list(**kwargs):
     else:
         return
 
-    for pID, name, password in table:
-        nameDict[pID] = crypto.decrypt_symm(auth_password, name)
+    for pID, name, password, iv in table:
+        nameDict[pID] = crypto.decrypt_symm(auth_password, name, iv)
 
-    #TODO comm send nameDict or error
+    res = "STATUS=LIST"
+    for pID, name in nameDict.items():
+        res += " SET=(ID={pID}:NAME={name})".format(pID=pID, name=name)
+
+    comm.responed(reqID, res)
 
 def set_user(**kwargs):
-    pass
+    '''DOC'''
+
+    reqID = _pop_value(kwargs, "REQ_ID")
+    auth_password = _pop_value(kwargs, 'AUTH_PASSWORD')
+
+    if reqID is None:
+        print('no requestor ID supplied')
+        return
+    if auth_password is None:
+        print('no authorization password was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no master password was given"')
+
+    salt = str.encode(str(time.time()))
+    hashedPass = crypto.hash_password(str.encode(auth_password), salt).decode()
+
+    data = None
+    with open('config/config.json') as data_file:
+        cfg = json.load(data_file)
+        data = cfg
+
+    data['default']['master_password'] = hashedPass
+    data['default']['salt'] = salt
+
+    with open('config/config.json', 'w') as data_file:
+        json.dump(data, data_file)
+
+    comm.responed(reqID, 'STATUS=OK')
 
 def close_connection(**kwargs):
-    pass
+    '''DOC'''
+
+    reqID = _pop_value(kwargs, "REQ_ID")
+    auth_password = _pop_value(kwargs, 'AUTH_PASSWORD')
+
+    if reqID is None:
+        print('no requestor ID supplied')
+        return
+    if auth_password is None:
+        print('no authorization password was supplied')
+        comm.responed(reqID, 'STATUS=ERROR MSG="no master password was given"')
+
+    if crypto.authorize(auth_password):
+        comm.close_connection(reqID)
 
 def shutdown():
     '''Shuts down the program'''
