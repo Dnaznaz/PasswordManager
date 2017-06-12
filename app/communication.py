@@ -85,7 +85,7 @@ def authorize(soc, addr):
     else:
         soc.close()
 
-def set_hadling_command(command):
+def set_handling_command(command):
     '''DOC'''
 
     global handlingCommand

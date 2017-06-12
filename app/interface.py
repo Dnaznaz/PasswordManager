@@ -14,7 +14,7 @@ _killEvent = threading.Event()
 def init_interface(**kwargs):
     '''Initiate the interface'''
 
-    comm.set_hadling_command(caller)
+    comm.set_handling_command(caller)
     threading.Thread(target=comm.init_communication, name='communication', daemon=True, args=(_killEvent,)).start()
 
     if kwargs['cmdListening'] is True:
@@ -37,7 +37,7 @@ def cmd_listener(event):
 
 
 def split_args(data, sep):
-    '''Split a single string to key value pair dict by separator'''
+    '''Split a single list to key value pair dict by separator'''
 
     args = {}
     for arg in data:
