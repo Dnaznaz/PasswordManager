@@ -18,6 +18,7 @@ def start():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--test", action="store_true", help='test mode')
     parser.add_argument("-r", "--reset", action="store_true", help='reset database')
+    parser.add_argument("--nonet", action="store_true", help="disable networking")
 
     options = vars(parser.parse_args())
 

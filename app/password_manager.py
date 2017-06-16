@@ -44,6 +44,7 @@ def bootstrap(options):
     dm.DATABASE_PATH = config['database_path']
     crypto.MASTER_PASSWORD = config['master_password']
     crypto.SALT = config['salt']
+    interface.TEST_MODE = config['test']
 
     # delete existent database if in reset arg was given
     if config['reset'] is True and os.path.isfile(dm.DATABASE_PATH):
@@ -101,4 +102,4 @@ def init_logger():
 def start_app():
     '''Start the interface of the program'''
 
-    interface.init_interface(cmdListening=config['test'])
+    interface.init_interface(cmdListening=config['test'], noNet=config['nonet'])

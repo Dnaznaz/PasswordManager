@@ -8,6 +8,8 @@ import os
 MASTER_PASSWORD = ''
 SALT = ''
 
+no_owner = True
+
 def hash_password(uPass, salt):
     '''DOC'''
 
@@ -59,13 +61,12 @@ def encrypt_asymm(auth_pass, data):
     cipherRSA = PKCS1_OAEP.new(rsaKey)
     encSessionKey = cipherRSA.encrypt(sessionKey)
 
-    cipherAES = AES.new(sessionKey, AES.MODE_EAX)
-    ciphertext, tag = cipherAES.encrypt_and_digest(data)
+    cipherAES = AES.new(sessionKey, AES.MODE_OFB)
+    ciphertext = cipherAES.encrypt(data)
 
-    msg = "{sessionKey},{vi},{tag},{ciphertext}".format(
+    msg = "{sessionKey},{vi},{ciphertext}".format(
         sessionKey = binascii.hexlify(encSessionKey).decode(),
         vi = binascii.hexlify(cipherAES.nonce).decode(),
-        tag = binascii.hexlify(tag).decode(),
         ciphertext = binascii.hexlify(ciphertext).decode()
         )
 
@@ -74,13 +75,13 @@ def encrypt_asymm(auth_pass, data):
 def decrypt_asymm(auth_pass, enc_data):
     '''DOC'''
 
-    encSessionKey, vi, tag, ciphertext = list(map(lambda x: binascii.unhexlify(str.encode(x)), enc_data.split(",")))
+    encSessionKey, vi, ciphertext = list(map(lambda x: binascii.unhexlify(str.encode(x)), enc_data.split(",")))
 
     cipherRSA = PKCS1_OAEP.new(auth_pass)
     sessionKey = cipherRSA.decrypt(encSessionKey)
 
-    cipherAES = AES.new(sessionKey, AES.MODE_EAX, vi)
-    data = cipherAES.decrypt_and_verify(ciphertext, tag)
+    cipherAES = AES.new(sessionKey, AES.MODE_OFB, vi)
+    data = cipherAES.decrypt(ciphertext)
 
     return tag
 
@@ -99,7 +100,12 @@ def authorize(auth_pass):
     if MASTER_PASSWORD == '':
         return True
 
-    return MASTER_PASSWORD == hash_password(auth_pass, SALT).decode()
+    if type(auth_pass) is str:
+        password = auth_pass.encode()
+    elif type(auth_pass) is bytes:
+        password = auth_pass
+
+    return MASTER_PASSWORD == hash_password(password, SALT.encode()).decode()
 
 def _padd(text):
     '''DOC'''

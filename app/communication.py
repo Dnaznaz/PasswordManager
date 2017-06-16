@@ -31,9 +31,13 @@ def init_communication(event):
 
     global socket
 
-    socket = bluetooth.BluetoothSocket(bluetooth.L2CAP)
+    socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
     socket.bind((SERVER_MAC, PORT))
     socket.listen(1)
+
+    uuid = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
+
+    bluetooth.advertise_service(socket, "PassServer", service_id=uuid, service_classes=[uuid, bluetooth.SERIAL_PORT_CLASS], profiles=[bluetooth.SERIAL_PORT_PROFILE])
 
     _generate_keys()
 
@@ -51,17 +55,6 @@ def start_listen(event):
 
 def authorize(soc, addr):
     '''DOC'''
-
-    soc.send("PUBLIC-KEY:{key}".format(key=publicKey))
-
-    soc.send("GET-PRIVATE-KEY")
-    encData = _recv_timeout(soc, 30)
-
-    if encData == "":
-        _terminate_connection(soc, addr)
-        return
-
-    clientKeys[addr] = crypto.decrypt_asymm(privateKey, encData)
 
     if crypto.no_owner:
         _send_encrypted(soc, "NO-OWNER", clientKeys[addr])
@@ -93,6 +86,8 @@ def set_handling_command(command):
 
 def responed(addr, msg):
     '''DOC'''
+    if addr == '-1':
+        return
 
     _send_encrypted(clients[addr], msg, clientKeys[addr])
 
@@ -110,7 +105,7 @@ def _handle(soc, addr):
         if encReq == "" and _send_isalive(soc, addr) is False:
             break
 
-        decReq = crypto.decrypt_asymm(privateKey, encReq)
+        decReq = encReq
         # handling command is set by the interface
         handlingCommand(decReq + ' REQ_ID={addr}'.format(addr=addr))
 
@@ -125,7 +120,7 @@ def _send_isalive(soc, addr):
         _terminate_connection(soc, addr)
         return False
     else:
-        decRes = crypto.decrypt_asymm(privateKey, encRes)
+        decRes = encRes
         if decRes == "ALIVE":
             return True
         else:
@@ -144,7 +139,7 @@ def _recv_timeout(soc, timeout, buffer=1024):
 def _send_encrypted(soc, msg, key):
     '''DOC'''
 
-    soc.send(crypto.encrypt_asymm(key, msg))
+    soc.send(msg)
 
 def _generate_keys():
     '''DOC'''
